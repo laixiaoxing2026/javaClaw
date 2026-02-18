@@ -85,6 +85,25 @@ https://q.qq.com/#/apps
 --- 
 ## 模块设计介绍
 
+| Java 包/模块 | 职责简述 | 对应 Python |
+|--------------|----------|-------------|
+| **`agent`** | 核心 Agent：循环、上下文、记忆、技能、子 Agent、工具 | `nanobot/agent/` |
+| **`agent.AgentLoop`** | Agent 主循环：取消息 → 建会话/上下文 → 调 LLM → 执行 tool_call → 写回复/会话 | `agent/loop.py` |
+| **`agent.ContextBuilder`** | 组装 system prompt、多轮 messages（含 tool 结果、assistant 消息） | `agent/context.py` |
+| **`agent.MemoryStore`** | 持久记忆：`MEMORY.md`（长期事实）+ `HISTORY.md`（可 grep 的日志） | `agent/memory.py` |
+| **`agent.SkillsLoader`** | 技能加载：workspace 与内置 skills 目录下的 `SKILL.md`，按需/常驻加载 | `agent/skills.py` |
+| **`agent.tools`** | 工具抽象与实现：文件读写/列表、shell、**message**（通过 bus 回发到当前会话）、MCP 等；执行时 params 由框架注入 channel、chatId、metadata | `agent/tools/` |
+| **`bus`** | 消息总线：`InboundMessage` / `OutboundMessage`，`MessageBus`（队列 + 出站分发） | `nanobot/bus/` |
+| **`channels`** | **QQ 已对接**，钉钉预留：`BaseChannel` 抽象 + `QQChannel`（完整实现）、`DingTalkChannel`（预留）；收消息时 `handleMessage` → `bus.publishInbound` | `nanobot/channels/` |
+| **`channels.ChannelManager`** | 按配置初始化钉钉（预留）/QQ channel、启动 outbound 分发循环（`dispatchOutbound`） | `channels/manager.py` |
+| **`providers`** | LLM：`LLMProvider` 接口、实现类（如 `OpenAICompatibleProvider`）、Registry 按 model 选 provider | `nanobot/providers/` |
+| **`config`** | 配置 Schema（POJO）：agents、channels.dingtalk、channels.qq、providers、gateway、tools 等；Loader 读 `~/.javaclawbot/config.json` | `nanobot/config/` |
+| **`session`** | 会话：按 `channel:chatId` 的 sessionKey 管理多轮对话历史与持久化 | `nanobot/session/` |
+| **`cron`** | 定时任务：Cron 配置与存储，到期通过 Agent 执行 | `nanobot/cron/` |
+| **`heartbeat`** | 心跳/主动唤醒（如定时拉活） | `nanobot/heartbeat/` |
+| **`cli`** | CLI：`javaClaw gateway`、`agent`、`onboard`、`status`、`cron` 等子命令 | `nanobot/cli/commands.py` |
+| **`skills`（资源）** | 内置技能 `SKILL.md` 文件，与 Python 版共用或复制一份 | `nanobot/skills/` |
+
 
 ---
 
