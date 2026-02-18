@@ -60,6 +60,9 @@
 | :---: | :---: | :---: |
 
 ### agent模式 通过命令行交互
+![img_4.png](img_4.png)
+![img_5.png](img_5.png)
+![img_6.png](img_6.png)
 
 ### debug模式 手动调试
 
