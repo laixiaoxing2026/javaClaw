@@ -215,7 +215,7 @@ java -jar target/javaclaw.jar gateway
 
 ---
 ## 关注作者
-![img_3.png](img/img_3.png)
+![qrCode.jpg](img/qrCode.jpg)
 ## License
 
 请以项目根目录或仓库标注为准。
