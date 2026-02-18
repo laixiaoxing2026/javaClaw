@@ -1,7 +1,35 @@
 # javaClaw
 
-参照 [openClaw](https://github.com/openClaw) 原理使用 **Java 8** 重写的超轻量个人 AI 助手，支持钉钉、QQ 等渠道，核心逻辑保持精简，适合学习与二次开发。
-
+参照 [openClaw](https://github.com/openClaw) 原理使用 **Java 8** 重写的超轻量个人 AI 助手，目前仅QQ渠道 可拓展，核心逻辑保持精简，仅4000行代码，不依赖任何框架，适合学习与二次开发。
+依赖仅如下
+```
+ <dependencies>
+        <!-- JSON 配置：Jackson -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <!-- Java 8 日期时间类型（Instant 等）序列化/反序列化 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <!-- CLI：Picocli -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+        <!-- HTTP 客户端：OpenAI 兼容 API 调用 -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>${okhttp.version}</version>
+        </dependency>
+    </dependencies>
+```
 ---
 
 ## 特性
@@ -22,6 +50,9 @@
 | 配置     | JSON + POJO（Jackson），路径统一为 **javaclawbot** |
 | LLM      | HTTP 调用 OpenAI 兼容 API（`LLMProvider` 抽象） |
 | 渠道     | 钉钉（DingTalk）、QQ（WebSocket 网关） |
+
+---
+## 示例
 
 ---
 
