@@ -1,5 +1,7 @@
 # javaClaw
 
+参照 openClaw 原理使用 Java 重写的 AI 小助手极简版，适合学习。
+
 超轻量个人 AI 助手（Java 8，仅钉钉渠道）。与 [nanobot](https://github.com/nanobot) 架构一致，核心逻辑保持精简。
 
 ## 技术栈
