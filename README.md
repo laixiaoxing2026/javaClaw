@@ -53,6 +53,10 @@
 
 ---
 ## 示例
+通过QQ可以让其远程查看主机信息、执行文件操作等
+![img.png](img.png)
+![img_1.png](img_1.png)
+![img_2.png](img_2.png)
 
 ---
 
