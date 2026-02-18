@@ -33,6 +33,3 @@ build/
 
 ### Mac OS ###
 .DS_Store
-
-### 本地文档，不提交 ###
-docs/
