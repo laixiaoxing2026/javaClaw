@@ -37,7 +37,7 @@
 - **多渠道**：钉钉（DingTalk）、QQ 机器人（WebSocket 网关），通过消息总线与 Agent 解耦，便于扩展新渠道
 - **LLM**：HTTP 调用任意 OpenAI 兼容 API（如 OpenAI、DeepSeek、Azure 等），由 `LLMProvider` 抽象
 - **Agent + 工具**：多轮对话、记忆与技能、内置工具（消息发送、文件读写、Shell、MCP 等），LLM 通过 tool_calls 与 MessageTool 等与渠道间接通信
-- **轻量**：Java 8，无虚拟线程，Picocli CLI + JSON 配置，数据与工作区统一在 `~/.javaclawbot`
+- **轻量**：Java 8，Picocli CLI + JSON 配置，数据与工作区统一在 `~/.javaclawbot`
 
 ---
 
@@ -45,7 +45,7 @@
 
 | 类别     | 选型 |
 |----------|------|
-| 语言     | Java 8（不使用虚拟线程） |
+| 语言     | Java 8 |
 | CLI      | Picocli |
 | 配置     | JSON + POJO（Jackson），路径统一为 **javaclawbot** |
 | LLM      | HTTP 调用 OpenAI 兼容 API（`LLMProvider` 抽象） |
