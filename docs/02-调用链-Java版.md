@@ -26,35 +26,34 @@ java -jar javaclaw.jar [command] [options]
 
 ```
 GatewayCommand.run()
-  ├── ConfigLoader.loadConfig()              // config 包，读 ~/.nanobot/config.json
+  ├── ConfigLoader.loadConfig()              // config 包，读 ~/.javaclawbot/config.json
   ├── new MessageBus()                       // bus 包，建 inbound/outbound BlockingQueue
   ├── ProviderFactory.fromConfig(config)     // 得到 LLMProvider 实现
   ├── new SessionManager(config.getWorkspacePath())
   ├── new CronService(cronStorePath)
   ├── new AgentLoop(bus, provider, workspace, ...)  // agent 包
   │     ├── new ContextBuilder(workspace)
-  │     ├── new ToolRegistry() + registerDefaultTools()
-  │     ├── new SubagentManager(...)
-  │     └── (MCP 在 run() 时懒连接 connectMcp())
+  │     └── new ToolRegistry() + registerDefaultTools()
   ├── cron.setOnJob(this::onCronJob)          // 回调里 agent.processDirect(...) + bus.publishOutbound(...)
   ├── new HeartbeatService(..., agent::processDirect)
   ├── new ChannelManager(config, bus)
-  │     └── initChannels()                   // 仅按 config 创建 DingTalkChannel（若启用）
+  │     └── initChannels()                   // 按 config 创建 DingTalkChannel（预留）、QQChannel（若启用，已对接）
   └── 启动并发任务（ExecutorService，Java 8）:
         ├── cron.start()
         ├── heartbeat.start()
         ├── executor.submit(() -> agent.run())           // 消费 inbound，处理消息，写 outbound
         ├── executor.submit(() -> channelManager.dispatchOutbound())
-        └── 若启用钉钉: executor.submit(() -> dingTalkChannel.start())
+        └── 各渠道: executor.submit(() -> channel.start())  // 当前仅 QQ 与平台有真实对接（WebSocket）
 ```
 
 **ChannelManager.startAll() 内部：**
 
 ```
 ChannelManager.startAll()
-  ├── 启动 dispatchOutbound() 的线程/任务   // 从 bus 取 outbound 分发给已注册 channel（当前仅钉钉）
-  └── 若启用钉钉: executor.submit(() -> dingTalkChannel.start())
-        └── dingTalkChannel.start()   // 钉钉 Stream/长连 逻辑，收到用户消息后调用 handleMessage
+  ├── 启动 dispatchOutbound() 的线程/任务   // 从 bus 取 outbound，按 msg.getChannel() 分发给 dingtalk / qq
+  └── 各启用渠道: executor.submit(() -> channel.start())
+        ├── DingTalkChannel.start()   // 钉钉为预留，未与钉钉平台真正对接
+        └── QQChannel.start()         // QQ 已对接：WebSocket 连接，收事件后 handleMessage → publishInbound
 ```
 
 ---
@@ -63,17 +62,17 @@ ChannelManager.startAll()
 
 ### 3.1 渠道侧：收消息 → 入队
 
-当前仅 **钉钉** 渠道。
+**当前已实现对接的为 QQ 渠道**；钉钉为预留（未与钉钉平台真正对接）。
 
 ```
-[钉钉开放平台回调] Stream 模式 / HTTP 回调
-  └── DingTalkChannel 的 handler
-        └── BaseChannel.handleMessage(senderId, chatId, content, media, metadata)
-              ├── 可选：isAllowed(senderId) 校验
-              └── bus.publishInbound(new InboundMessage("dingtalk", senderId, chatId, content, ...))
+[钉钉] 预留：DingTalkChannel 有 HTTP 回调框架，但未实现与钉钉开放平台的真正对接。
+
+[QQ] 已对接：WebSocket 事件（单聊 C2C_MESSAGE_CREATE、DIRECT_MESSAGE_CREATE 等）
+  └── QQChannel.dispatchEvent(t, d) 解析 senderId、chatId、content、metadata（含 qq_msg_id）
+        └── BaseChannel.handleMessage(...) → bus.publishInbound(new InboundMessage("qq", ...))
 ```
 
-即：**Channel 收到消息 → handleMessage → bus.publishInbound(InboundMessage)**。
+即：**Channel 收到消息 → handleMessage → bus.publishInbound(InboundMessage)**。当前仅 QQ 有真实收消息。
 
 ### 3.2 Agent 侧：出队 → 处理 → 回复入队
 
@@ -86,9 +85,9 @@ AgentLoop.run()   // 循环，通常 while (running)
         ├── 若 /new：session.clear() + 后台 consolidateMemory(session, true) + 返回 "New session..."
         ├── 若 /help：直接返回帮助文案
         ├── 若 session.getMessages().size() > memoryWindow：executor.submit(() -> consolidateMemory(session))
-        ├── setToolContext(msg.getChannel(), msg.getChatId())
+        ├── requestContext = { channel, chatId, metadata }  // 供工具执行时合并进 params
         ├── initialMessages = context.buildMessages(history, msg.getContent(), ...)
-        ├── RunResult result = runAgentLoop(initialMessages)
+        ├── RunResult result = runAgentLoop(initialMessages, streamConsumer, requestContext)
         ├── session.addMessage("user", ...); session.addMessage("assistant", ...); sessions.save(session)
         └── return new OutboundMessage(msg.getChannel(), msg.getChatId(), result.getContent(), ...)
   └── bus.publishOutbound(response)
@@ -117,8 +116,9 @@ AgentLoop.runAgentLoop(initialMessages)
     ├── 若 response.hasToolCalls():
     │     ├── context.addAssistantMessage(messages, response.getContent(), toolCallDicts, response.getReasoningContent())
     │     ├── 对每个 toolCall:
-    │     │     └── result = tools.execute(toolCall.getName(), toolCall.getArguments())
-    │     │           └── ToolRegistry.execute() → 具体 Tool.execute(params)
+    │     │     └── params = merge(toolCall.getArguments(), requestContext)  // channel、chatId、metadata 并入 params
+    │     │     └── result = tools.execute(toolCall.getName(), params)
+    │     │           └── ToolRegistry.execute() → 具体 Tool.execute(params)，如 MessageTool 从 params 取 channel/chatId
     │     ├── context.addToolResult(messages, toolCall.getId(), toolName, result)
     │     └── messages.add(userMessage("Reflect on the results and decide next steps."))
     │     → 继续下一轮 loop
@@ -132,8 +132,8 @@ AgentLoop.runAgentLoop(initialMessages)
 ChannelManager.dispatchOutbound()   // 独立线程/任务循环（ExecutorService）
   └── loop:
         ├── msg = bus.consumeOutbound()
-        ├── channel = channels.get(msg.getChannel())   // 当前仅 "dingtalk"
-        └── dingTalkChannel.send(msg)                  // 钉钉 API 发回
+        ├── channel = channels.get(msg.getChannel())   // "dingtalk" 或 "qq"
+        └── channel.send(msg)                          // 当前仅 QQChannel.send 会真正调用 QQ 平台 API 发消息；钉钉为占位
 ```
 
 ---

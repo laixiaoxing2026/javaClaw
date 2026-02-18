@@ -34,7 +34,7 @@
 
 ## 特性
 
-- **多渠道**：钉钉（DingTalk）、QQ 机器人（WebSocket 网关），通过消息总线与 Agent 解耦，便于扩展新渠道
+- **多渠道**：**当前已实现对接的为 QQ 机器人**（WebSocket 网关 + 单聊发消息）；钉钉（DingTalk）为预留，未与钉钉平台真正对接。通过消息总线与 Agent 解耦，便于扩展新渠道
 - **LLM**：HTTP 调用任意 OpenAI 兼容 API（如 OpenAI、DeepSeek、Azure 等），由 `LLMProvider` 抽象
 - **Agent + 工具**：多轮对话、记忆与技能、内置工具（消息发送、文件读写、Shell、MCP 等），LLM 通过 tool_calls 与 MessageTool 等与渠道间接通信
 - **轻量**：Java 8，Picocli CLI + JSON 配置，数据与工作区统一在 `~/.javaclawbot`
@@ -49,7 +49,7 @@
 | CLI      | Picocli |
 | 配置     | JSON + POJO（Jackson），路径统一为 **javaclawbot** |
 | LLM      | HTTP 调用 OpenAI 兼容 API（`LLMProvider` 抽象） |
-| 渠道     | 钉钉（DingTalk）、QQ（WebSocket 网关） |
+| 渠道     | QQ（已对接，WebSocket 网关）；钉钉（预留） |
 
 ---
 ## 示例
@@ -139,7 +139,7 @@ send() 里调 QQ 开放接口 POST /v2/users/{openid}/messages
 
 ### 3. 设计原因
 
-- **渠道与 Agent 解耦**：Agent（含 MessageTool）只认识「channel + chatId + content」，不关心是 QQ 还是钉钉。发消息统一用 `bus.publishOutbound(msg)`，由 ChannelManager 根据 `msg.getChannel()` 决定交给哪个渠道的 `send()`。加新渠道（例如再加一个 IM）不用改 Agent / MessageTool。
+- **渠道与 Agent 解耦**：Agent（含 MessageTool）只认识「channel + chatId + content」，不关心具体渠道。发消息统一用 `bus.publishOutbound(msg)`，由 ChannelManager 根据 `msg.getChannel()` 决定交给哪个渠道的 `send()`。**当前已实现与平台对接的仅有 QQ 渠道**（钉钉为预留），加新渠道不用改 Agent / MessageTool。
 - **MessageTool 只负责“要发什么”**：只把「发给谁、发什么」写成一条 `OutboundMessage` 丢进总线，不负责 HTTP/WebSocket 等具体发送。真正发 QQ 的是 `QQChannel.send()`，「业务决策（发什么）」与「渠道实现（怎么发）」分离。
 - **一条总线串起收发**：入站 `QQChannel → publishInbound → AgentLoop consumeInbound`；出站 `MessageTool（或别的逻辑）→ publishOutbound → ChannelManager consumeOutbound → QQChannel.send()`。所有渠道和 Agent 都通过 MessageBus 通信，便于扩展和测试。
 

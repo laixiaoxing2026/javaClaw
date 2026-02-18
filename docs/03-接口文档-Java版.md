@@ -12,7 +12,7 @@
 
 | 字段 | Java 类型 | 说明 |
 |------|-----------|------|
-| `channel` | `String` | 渠道名：`dingtalk`、`cli` 等 |
+| `channel` | `String` | 渠道名：`dingtalk`、`qq`、`cli` 等 |
 | `senderId` | `String` | 发送者 ID |
 | `chatId` | `String` | 会话/群组 ID |
 | `content` | `String` | 消息正文 |
@@ -70,20 +70,21 @@ Agent 发往渠道的回复结构。
 
 **包**：`com.javaclaw.channels`
 
-**javaClaw 当前仅支持钉钉**：仅实现 `DingTalkChannel`（继承 `BaseChannel`），在 `ChannelManager.initChannels()` 中按配置实例化并加入 `channels` Map。
+**javaClaw 渠道现状**：**QQ 已实现与平台对接**（`QQChannel`：WebSocket 收事件 + 单聊发消息 API）；**钉钉为预留**（`DingTalkChannel` 存在但未与钉钉开放平台真正对接）。二者均继承 `BaseChannel`，在 `ChannelManager.initChannels()` 中按配置实例化并加入 `channels` Map（键为 `"dingtalk"`、`"qq"`）。
 
 ### 2.1 类与构造
 
-- **name**：`String`，渠道标识；钉钉为 `"dingtalk"`，需与 `OutboundMessage.getChannel()` 一致以便分发。
-- **构造**：`BaseChannel(ChannelConfig config, MessageBus bus)`
-    - `config`：该渠道在 `Config.getChannels()` 下对应的配置 POJO（当前仅需 `DingTalkConfig`）；
+- **name**：`String`，渠道标识；钉钉为 `"dingtalk"`，QQ 为 `"qq"`，需与 `OutboundMessage.getChannel()` 一致以便分发。
+- **构造**：`BaseChannel(String name, MessageBus bus)`
+    - `name`：渠道名；
     - `bus`：共享的 `MessageBus`。
+- 子类（如 `DingTalkChannel`、`QQChannel`）在构造时传入各自配置（DingTalkConfig/QQConfig、GatewayConfig）及 bus，并调用 `super("dingtalk", bus)` 或 `super("qq", bus)`。**当前仅 QQChannel 的 start/send 与平台有真实对接**。
 
 ### 2.2 抽象方法（必须实现）
 
 | 方法 | 签名 | 说明 |
 |------|------|------|
-| `start` | `void start()` | 启动渠道：建连、监听平台消息（钉钉为 Stream/HTTP 回调），收到后通过 `handleMessage` 转发到 `bus.publishInbound`；阻塞式运行，由 ExecutorService 线程调用 |
+| `start` | `void start()` | 启动渠道：建连、监听平台消息；**QQChannel** 为 WebSocket 连接并收事件后 `handleMessage` → `publishInbound`；钉钉为预留。阻塞式运行，由 ExecutorService 线程调用 |
 | `stop` | `void stop()` | 停止渠道并释放资源 |
 | `send` | `void send(OutboundMessage msg)` | 将一条出站消息通过平台 API 发送到 `msg.getChatId()` |
 
@@ -152,7 +153,7 @@ Agent 发往渠道的回复结构。
 | `getName()` | `String` | 工具名，LLM 通过此名调用 |
 | `getDescription()` | `String` | 工具说明，会传给 LLM |
 | `getParameters()` | `Map<String, Object>` 或 JSON Schema 结构 | JSON Schema（object），描述参数 |
-| `execute` | `String execute(Map<String, Object> params)` | 执行工具，返回结果字符串（会直接作为 tool result 给 LLM）；Java 8 下同步即可，如需异步可用 `ExecutorService` 封装 |
+| `execute` | `String execute(Map<String, Object> params)` | 执行工具，返回结果字符串（会直接作为 tool result 给 LLM）。params 中除 LLM 传入参数外，框架会注入 **channel**、**chatId**、**metadata**（如 QQ 的 qq_msg_id），供需回发消息的工具（如 MessageTool）使用；其他工具可忽略这些键。Java 8 下同步即可。 |
 
 **可复用方法（抽象类中提供）**：
 
@@ -176,7 +177,7 @@ Agent 发往渠道的回复结构。
 | `get` | `Tool get(String name)` 或 `Optional<Tool> get(String name)` | 按名称获取 |
 | `has` | `boolean has(String name)` | 是否已注册 |
 | `getDefinitions` | `List<Map<String, Object>> getDefinitions()` | 所有工具的 OpenAI function 定义，供 `provider.chat(tools=...)` 使用 |
-| `execute` | `String execute(String name, Map<String, Object> params)` | 校验后执行指定工具，返回结果字符串；未找到或校验失败返回错误信息字符串 |
+| `execute` | `String execute(String name, Map<String, Object> params)` | 校验后执行指定工具，返回结果字符串；未找到或校验失败返回错误信息字符串。params 可含框架注入的 channel、chatId、metadata。 |
 
 **属性**：`getToolNames()` → `List<String>`。
 
@@ -252,7 +253,7 @@ Agent 发往渠道的回复结构。
 
 ### 6.2 SessionManager
 
-**构造**：`SessionManager(Path workspace)`。会话文件存放在 `~/.nanobot/sessions/`（或通过 Config 配置），与 workspace 解耦。
+**构造**：`SessionManager(Path workspace)`。会话文件存放在 `~/.javaclawbot/sessions/`（或通过 Config 配置），与 workspace 解耦。
 
 **方法**：
 
@@ -290,12 +291,12 @@ Agent 发往渠道的回复结构。
 
 ### 8.1 Config 根结构
 
-POJO，与 `~/.nanobot/config.json` 中 **javaClaw 所需部分** 一致，键名 camelCase。**渠道仅保留钉钉**。
+POJO，与 `~/.javaclawbot/config.json` 中 **javaClaw 所需部分** 一致，键名 camelCase。**渠道含钉钉（channels.dingtalk，预留）与 QQ（channels.qq，已实现对接）**。
 
 | 字段 | Java 类型 | 说明 |
 |------|-----------|------|
 | `agents` | `AgentsConfig` | 默认 workspace、model、maxTokens、temperature、maxToolIterations、memoryWindow |
-| `channels` | `ChannelsConfig` | **仅需** `dingtalk`（DingTalkConfig）；可不包含 telegram、discord、feishu 等 |
+| `channels` | `ChannelsConfig` | `dingtalk`（DingTalkConfig，预留）、`qq`（QQConfig，已对接）；可不包含 telegram、discord、feishu 等 |
 | `providers` | `ProvidersConfig` | 各 LLM provider 的 apiKey、apiBase、extraHeaders |
 | `gateway` | `GatewayConfig` | host、port |
 | `tools` | `ToolsConfig` | web.search、exec（timeout）、restrictToWorkspace、mcpServers |
@@ -313,7 +314,7 @@ POJO，与 `~/.nanobot/config.json` 中 **javaClaw 所需部分** 一致，键�
 
 | 方法 | 签名 | 说明 |
 |------|------|------|
-| `getConfigPath` | `static Path getConfigPath()` | 默认配置文件路径：`~/.nanobot/config.json` |
+| `getConfigPath` | `static Path getConfigPath()` | 默认配置文件路径：`~/.javaclawbot/config.json` |
 | `getDataDir` | `static Path getDataDir()` | 数据目录（如 cron、sessions 的父目录） |
 | `loadConfig` | `static Config loadConfig()` 或 `loadConfig(Path configPath)` | 从文件加载并反序列化，失败则返回默认 Config |
 | `saveConfig` | `static void saveConfig(Config config)` 或 `saveConfig(Config config, Path configPath)` | 将 Config 写回 JSON（键为 camelCase） |
@@ -322,5 +323,5 @@ POJO，与 `~/.nanobot/config.json` 中 **javaClaw 所需部分** 一致，键�
 
 ## 九、相关文档
 
-- [01-项目梳理-Java版](./01-项目梳理-Java版.md) — javaClaw 架构与模块职责（Java 8、仅钉钉）
+- [01-项目梳理-Java版](./01-项目梳理-Java版.md) — javaClaw 架构与模块职责（Java 8、QQ 已对接/钉钉预留）
 - [02-调用链-Java版](./02-调用链-Java版.md) — javaClaw 从入口到消息处理、Cron/Heartbeat 的调用关系  

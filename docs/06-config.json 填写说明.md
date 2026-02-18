@@ -120,13 +120,14 @@
 
 ---
 
-### 3. `channels`（可选，当前仅钉钉）
+### 3. `channels`（可选，QQ 已对接、钉钉预留）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `dingtalk` | object | 钉钉渠道配置 |
+| `dingtalk` | object | 钉钉渠道配置（**预留**：当前未实现与钉钉平台真正对接） |
+| `qq` | object | QQ 渠道配置（**已实现对接**：WebSocket 收消息 + 单聊发消息） |
 
-`channels.dingtalk` 各字段：
+`channels.dingtalk` 各字段（预留，启用后仅为占位逻辑）：
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -136,9 +137,9 @@
 | `appSecret` | string | 启用时建议填 | 钉钉应用 AppSecret |
 | `callbackUrl` | string | 否 | 回调或 Stream 相关 URL，按钉钉开放平台要求配置 |
 
-不启用钉钉时，可省略 `channels` 或 `dingtalk.enabled: false`。
+不启用钉钉时，可省略 `channels` 或 `dingtalk.enabled: false`。**当前实际可用的为 QQ 渠道**。
 
-**QQ 渠道**（`channels.qq`）：通过 **WebSocket** 连接 QQ 机器人网关，无需 HTTP 回调端口。
+**QQ 渠道**（`channels.qq`，**已实现对接**）：通过 **WebSocket** 连接 QQ 机器人网关，无需 HTTP 回调端口。
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -161,7 +162,7 @@
 | 字段 | 类型 | 必填 | 说明 | 默认 |
 |------|------|------|------|------|
 | `host` | string | 否 | 监听地址 | `"0.0.0.0"` |
-| `port` | number | 否 | 监听端口（钉钉 HTTP 回调等） | `8765` |
+| `port` | number | 否 | 监听端口（钉钉预留时 HTTP 回调等；QQ 不依赖此端口） | `8765` |
 
 ---
 
@@ -195,11 +196,15 @@
   - key：`"deepseek"`
   - value：`"apiKey"`、`"apiBase": "https://api.deepseek.com/v1"`。
 
-### 启用钉钉
+### 启用钉钉（预留）
 
-- `channels.dingtalk.enabled`: `true`。
-- 填好 `appKey`、`appSecret`，并按钉钉文档配置 `callbackUrl`（若需要）。
-- `gateway.port` 与钉钉回调 URL 的端口一致（如 8765）。
+- 钉钉渠道为**预留状态**，当前未实现与钉钉开放平台的真正对接；若 `channels.dingtalk.enabled: true`，仅会启动占位逻辑。
+- 填好 `appKey`、`appSecret`、`callbackUrl` 等，便于后续实现对接时直接使用。
+
+### 启用 QQ（已对接）
+
+- `channels.qq.enabled`: `true`。
+- 填好 `appId`、`clientSecret`（或 `token`），详见上文 QQ 渠道说明。**当前实际可用的渠道为 QQ**。
 
 ---
 

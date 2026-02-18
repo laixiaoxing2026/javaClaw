@@ -8,7 +8,7 @@
 |----|------|
 | **技术栈** | 按文档定死：Java 8，不使用虚拟线程；Picocli（或 JCommander）；JSON + POJO（Jackson）；LLM 通过 HTTP 调用 OpenAI 兼容 API，由 `LLMProvider` 抽象。 |
 | **配置与数据路径** | 统一使用 **javaclawbot**：配置文件 `~/.javaclawbot/config.json`，数据目录 `~/.javaclawbot`，工作区默认 `~/.javaclawbot/workspace`，会话目录 `~/.javaclawbot/sessions/` 等（详见第二节）。 |
-| **渠道** | 暂时仅实现**钉钉**；不实现 Telegram、飞书、Slack 等。 |
+| **渠道** | **当前已实现对接的为 QQ**（QQChannel，WebSocket 单聊收 + 单聊发消息 API）；**钉钉为预留**（DingTalkChannel 存在但未与钉钉平台真正对接）。可扩展其他渠道。 |
 | **入口与命令** | 与文档一致：可执行 JAR 或 `java -cp ... Main`，子命令 `gateway`、`agent`、`onboard`、`status`、`cron`；对外统称 **javaClaw**（如 `javaClaw gateway`、`javaClaw agent`）。 |
 | **接口** | 与 [03-接口文档-Java版](./03-接口文档-Java版.md) 保持一致，作为实现与扩展的权威依据。 |
 
@@ -52,7 +52,7 @@
 用户/渠道 ← Channel ← MessageBus(outbound) ← 回复/OutboundMessage
 ```
 
-- **Channel**：当前仅钉钉，`BaseChannel` 抽象 + `DingTalkChannel` 实现。
+- **Channel**：QQ 已对接、钉钉预留；`BaseChannel` 抽象 + `QQChannel`（完整实现）、`DingTalkChannel`（预留）。
 - **MessageBus**：`BlockingQueue<InboundMessage>` / `BlockingQueue<OutboundMessage>`，ExecutorService 驱动 Agent 循环与 outbound 分发。
 - **AgentLoop**：消费 inbound、组装 context、调用 LLM、执行 tool、写入 outbound。
 
@@ -62,12 +62,12 @@
 
 | 包/模块 | 职责 |
 |---------|------|
-| **config** | 配置 Schema（POJO）、ConfigLoader 读 `~/.javaclawbot/config.json`，仅保留 agents、channels.dingtalk、providers、gateway、tools 等所需字段。 |
+| **config** | 配置 Schema（POJO）、ConfigLoader 读 `~/.javaclawbot/config.json`，含 agents、channels.dingtalk、channels.qq、providers、gateway、tools 等。 |
 | **bus** | InboundMessage、OutboundMessage、MessageBus。 |
 | **providers** | LLMProvider、ToolCallRequest、LLMResponse、ProviderFactory/Registry、OpenAI 兼容实现。 |
 | **session** | Session、SessionManager（按 channel:chatId 的 sessionKey 管理多轮对话与持久化，存于 ~/.javaclawbot/sessions/）。 |
 | **agent** | AgentLoop、ContextBuilder、MemoryStore、SkillsLoader、SubagentManager、tools（Tool、ToolRegistry 及默认工具实现）。 |
-| **channels** | BaseChannel、DingTalkChannel、ChannelManager（仅初始化钉钉、outbound 分发循环）。 |
+| **channels** | BaseChannel、QQChannel（已对接）、DingTalkChannel（预留）、ChannelManager（按配置初始化、outbound 分发循环）。 |
 | **cron** | Cron 配置与存储，到期通过 Agent 执行。 |
 | **heartbeat** | 心跳/主动唤醒。 |
 | **cli** | Main、GatewayCommand、AgentCommand、OnboardCommand、StatusCommand、CronCommand 等。 |
@@ -78,16 +78,16 @@
 
 - 入口：`java -jar javaclaw.jar [command] [options]` 或 `java -cp ... com.javaclaw.cli.Main [command] [options]`。
 - 子命令：`gateway`、`agent`、`onboard`、`status`、`cron` 等；对外统称 **javaClaw**（如 `javaClaw gateway`、`javaClaw agent`）。
-- Gateway 启动：ConfigLoader.loadConfig()（读 ~/.javaclawbot/config.json）→ MessageBus、ProviderFactory、SessionManager、CronService、AgentLoop、HeartbeatService、ChannelManager → ExecutorService 提交 agent.run()、dispatchOutbound()、dingTalkChannel.start()、cron.start()、heartbeat.start()。
+- Gateway 启动：ConfigLoader.loadConfig()（读 ~/.javaclawbot/config.json）→ MessageBus、ProviderFactory、SessionManager、CronService、AgentLoop、HeartbeatService、ChannelManager → ExecutorService 提交 agent.run()、dispatchOutbound()、各 channel.start()（当前仅 QQ 与平台有真实连接）、cron.start()、heartbeat.start()。
 
 ---
 
 ## 七、接口与扩展（与 03-接口文档 一致）
 
 - **消息与总线**：InboundMessage、OutboundMessage 字段与 getSessionKey()；MessageBus 的 publishInbound/consumeInbound、publishOutbound/consumeOutbound(timeout)、stop、getInboundSize/getOutboundSize。
-- **渠道**：BaseChannel 的 start、stop、send、isAllowed、handleMessage；DingTalkChannel 实现；ChannelManager 的 initChannels（仅钉钉）、startAll、dispatchOutbound。
+- **渠道**：BaseChannel 的 start、stop、send、isAllowed、handleMessage；QQChannel 已对接、DingTalkChannel 预留；ChannelManager 的 initChannels、startAll、dispatchOutbound。
 - **LLM**：LLMProvider.chat、getDefaultModel；LLMResponse、ToolCallRequest 结构；ProviderFactory.fromConfig。
-- **工具**：Tool（getName、getDescription、getParameters、execute、validateParams、toSchema）；ToolRegistry（register、unregister、get、has、getDefinitions、execute、getToolNames）。
+- **工具**：Tool（getName、getDescription、getParameters、execute(params)、validateParams、toSchema）；params 可含框架注入的 channel、chatId、metadata；ToolRegistry（register、unregister、get、has、getDefinitions、execute(name, params)、getToolNames）。
 - **Agent**：AgentLoop 构造参数与 run、processDirect、stop、closeMcp；ContextBuilder.buildSystemPrompt、buildMessages、addToolResult、addAssistantMessage；MemoryStore.readLongTerm、writeLongTerm、appendHistory、getMemoryContext。
 - **会话**：Session（addMessage、getHistory、clear）；SessionManager（getOrCreate、save、invalidate）。
 - **技能**：SkillsLoader（listSkills、loadSkill、loadSkillsForContext、buildSkillsSummary、getAlwaysSkills、getSkillMetadata）。
@@ -99,11 +99,11 @@
 
 ## 八、设计特点（与文档一致）
 
-1. 渠道与 Agent 解耦：所有 I/O 经 MessageBus；当前仅钉钉，后续扩展通过实现 BaseChannel 并在 ChannelManager 注册。
+1. 渠道与 Agent 解耦：所有 I/O 经 MessageBus；当前已实现对接的为 QQ，钉钉为预留，后续扩展通过实现 BaseChannel 并在 ChannelManager 注册。
 2. LLM 与配置解耦：Provider 接口 + 工厂/Registry，新 provider 实现接口并在配置与注册中增加即可。
 3. 工具可扩展：内置工具 + MCP，统一由 ToolRegistry 注册与执行。
 4. 会话与记忆分离：Session 管对话窗口与历史条数；Memory 管长期事实与历史日志；consolidate 时把会话压缩进记忆。
-5. 体量可控：核心逻辑集中在 agent、bus、channels（仅钉钉）、config。
+5. 体量可控：核心逻辑集中在 agent、bus、channels（QQ 已对接、钉钉预留）、config。
 6. Java 8 与无虚拟线程：全程 ExecutorService + BlockingQueue。
 
 ---
