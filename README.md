@@ -56,29 +56,29 @@
 ### 网关模式，通过app来交互
 通过 QQ 可以让其远程查看主机信息、执行文件操作等。
 
-| ![截图1](img.png) | ![截图2](img_1.png) | ![截图3](img_2.png) |
+| ![截图1](img/img.png) | ![截图2](img/img_1.png) | ![截图3](img/img_2.png) |
 | :---: | :---: | :---: |
 
 ### agent模式 通过命令行交互
-![img_4.png](img_4.png)
-![img_5.png](img_5.png)
-![img_6.png](img_6.png)
+![img_4.png](img/img_4.png)
+![img_5.png](img/img_5.png)
+![img_6.png](img/img_6.png)
 
 ### debug模式 手动调试
 这样就可以本地调试
-![img_7.png](img_7.png)
-![img_8.png](img_8.png)
+![img_7.png](img/img_7.png)
+![img_8.png](img/img_8.png)
 ### QQ机器人申请以及配置
 qq渠道是最容易最简单的，三步即可，无任何卡点
 第一步 登陆qq开放平台
 https://q.qq.com/#/apps 
 第二步 创建机器人
-![img_9.png](img_9.png)
+![img_9.png](img/img_9.png)
 第三步 机器人配置
 选择开发、沙箱配置，在消息列表配置 添加自己的QQ号，然后点击箭头指向的地方会弹出二维码 扫码关注即进入聊天，不需要发布到线上
-![img_10.png](img_10.png)
+![img_10.png](img/img_10.png)
 点击开发管理 就可以拿到机器人的app token等，然后配置到config.json
-![img_11.png](img_11.png)
+![img_11.png](img/img_11.png)
 
 ### 配置说明 参考这里
 [06-config.json 填写说明](docs/06-config.json%20填写说明.md)
@@ -215,7 +215,7 @@ java -jar target/javaclaw.jar gateway
 
 ---
 ## 关注作者
-![img_3.png](img_3.png)
+![img_3.png](img/img_3.png)
 ## License
 
 请以项目根目录或仓库标注为准。
