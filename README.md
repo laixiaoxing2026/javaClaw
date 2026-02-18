@@ -1,6 +1,6 @@
 # javaClaw
 
-参照 [openClaw](https://github.com/openClaw) 原理使用 **Java 8** 重写的超轻量个人 AI 助手，支持钉钉、QQ 等渠道，与 [nanobot](https://github.com/nanobot) 架构一致，核心逻辑保持精简，适合学习与二次开发。
+参照 [openClaw](https://github.com/openClaw) 原理使用 **Java 8** 重写的超轻量个人 AI 助手，支持钉钉、QQ 等渠道，核心逻辑保持精简，适合学习与二次开发。
 
 ---
 
