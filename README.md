@@ -198,7 +198,8 @@ java -jar target/javaclaw.jar gateway
 | [06-config.json 填写说明](docs/06-config.json%20填写说明.md) | config.json 各节点与常见场景 |
 
 ---
-
+## 关注作者
+![img_3.png](img_3.png)
 ## License
 
 请以项目根目录或仓库标注为准。
